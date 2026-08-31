@@ -119,7 +119,7 @@ The `mylm` package implements ordinary least squares (OLS) for a linear model $Y
 - **Asymptotic** $\chi^2$-test: $\chi^2 = \frac{SSE_{\text{reduced}} - SSE_{\text{full}}}{\hat{\sigma}^2_{\text{full}}}$
 - **Coefficient of determination:** $R^2 = 1 - \frac{SSE}{SST}$
 
-## a) & b) Fitting the model and calculating standard errors
+## a) & b)
 
 We fit a simple linear regression model to the data with `wages` as the response and `education` as the predictor.
 
@@ -131,14 +131,14 @@ print.mylm(model1)
 print(model1b)
 ```
 
-The output confirms that our `mylm` function yields the exact same coefficient estimates as the standard `lm` function.
+The output confirms that our `mylm` function gives the exact same coefficient estimates as the standard `lm` function.
 
 ```{r summary_model}
 summary.mylm(model1)
 ```
 
 **Interpretation of parameters:**
-* **Intercept ($\hat{\beta}_0 \approx 4.97$):** The expected hourly wage for a person with 0 years of education. This is extrapolated outside the data range and holds no practical meaning since wages cannot be negative.
+* **Intercept ($\hat{\beta}_0 \approx 4.97$):** It corresponds to the theoretical wage of a person who never went to school. By explicitly calculating it, it appears that the overall average hourly wage in the dataset is much higher (`r round(mean(SLID$wages), 2)`). This massive gap makes logical sense, as the intercept targets an extreme and marginal profile.
 * **Education ($\hat{\beta}_1 \approx 0.79$):** For each additional year of education, the expected hourly wage increases by 0.79 units.
 * **Significance (z-test):** The $z$-value for education is 20.28, yielding a p-value strictly close to 0. We confidently reject the null hypothesis ($H_0: \beta_1 = 0$); education is a highly significant predictor.
 
@@ -165,9 +165,7 @@ In simple linear regression, the $\chi^2$ statistic with 1 degree of freedom is 
 The coefficient of determination $R^2$ is **0.0936**. 
 
 **Interpretation:** 
-Approximately **9.36%** of the total variability in hourly wages is explained by the variance in years of education. The remaining **90.64%** is unexplained by this model.
-
-
+Approximately **9.36%** of the total variability in hourly wages is explained by the variance in years of education. The remaining **90.64%** is unexplained by this model.While the massive $z$-statistic ($> 20$) confirms a highly significant positive impact of **education** on **wages**, the low $R^2$ demonstrates that education alone is insufficient to predict exact individual pay. This highlights the distinction between statistical significance and predictive accuracy. The majority of the variation in hourly wages is driven by factors excluded from this simple model, which include other available dataset variables like **age**, **sex**, and **language**,. Meaning that finding such a low $R^2$ is expected in this case.
 
 # Part 3: Multiple linear regression
 
