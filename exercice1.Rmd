@@ -1,6 +1,7 @@
 ---
-title : " TMA4315 Exercise 1 Linear models for Gaussian data "
-author : " Thomas Guillot , Lucas Paraveman , Dario Mazotti "
+title : "TMA4315 Exercise 1: Linear models for Gaussian data"
+author : "Group [X]: Thomas Guillot, Lucas Paraveman, Dario Mazotti"
+date: "`r Sys.Date()`"
 output:
   pdf_document:
     toc: true
@@ -9,65 +10,94 @@ output:
 ---
 
 ```{r setup, include = FALSE}
-knitr::opts_chunk$set(echo = TRUE, warning = FALSE , message = FALSE)
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
 library(mylm)
 library(GGally)
 library(ggplot2)
 ```
 
-#Part 1: Explanatory analysis of the dataset First of all we import the dataset and prepare the data for the analysis
+# Part 1: Explanatory analysis of the dataset
 
-```{r}
+First of all we import the dataset and we prepare the data for the analysis.
+
+```{r data}
 library(car)
 data(SLID, package = "carData")
 SLID <- SLID[complete.cases(SLID), ]
 ```
 
-Afterwards we draw the draw a matrix of diagnostic plots of all the variables
+After that we have `r nrow(SLID)` observations and 5 variables: `wages` (the hourly
+wage rate), `education` (the number of years of schooling), `age` (in years), and the
+two categorical variables `sex` and `language`.
 
-```{r}
-ggpairs(SLID, lower = list(continuous = wrap("points", alpha = 0.3, size=0.5)))
+Then we plot a matrix of diagnostic plots for all the variables.
+
+```{r ggpairs, fig.width = 8, fig.height = 6}
+ggpairs(SLID, lower = list(continuous = wrap("points", alpha = 0.3, size = 0.5)))
 ```
 
-Looking at the plot, there appear to be some noteworthy relationships between pairs of variables:
+On this plot we can see some interesting relations between the pairs of variables:
 
-- `education` and `wages` have a moderate positive correlation of 0.306 that is, however, highly statistically significant. The same applies to `age` and `wages`.
+- `education` and `wages` have a moderate positive correlation of 0.306, and it is
+highly significant. It is the same thing for `age` and `wages`, with a correlation of
+0.360. The two correlations are quite small, so we should not expect a very big $R^2$
+later: a correlation of 0.306 gives only about $0.306^2 \approx 9\%$ of the
+variability of `wages`.
 
-- median wages are noticeably higher for male individuals compared to females, while they are effectively the same in relation to the language. This suggests that an individual's gender might be strongly related with their wage, while their language has a likely much weaker effect. In both cases, however, we can see that most wages are concentrated towards relatively low values, with the exception of a few, much higher outliers. This is further confirmed by observing the `wages` density plot, which is skewed to the right.
+- the median wage is higher for men (16.20) than for women (12.29), but it is almost
+the same for the different languages (14.09, 14.34, 14.24). This means that the
+gender of a person can be strongly related to the wage, while the language has
+probably a much weaker effect. In the two cases we can also see that most of the
+wages are concentrated on low values, except a few outliers which are much higher. We
+can confirm this with the density plot of `wages`, which is skewed to the right.
 
-- `age` and `education` have a very weak, but highly statistically significant, negative correlation of -0.106. This means that these two variables are most likely uncorrelated.
+- `age` and `education` have a very weak negative correlation of -0.106, but it is
+highly significant. This means that the two variables are almost uncorrelated, but
+not exactly. This is why the simple and the multiple regression estimates will not be
+the same in Part 3.
 
-- median education is effectively the same for male and female individuals, and very similar for individuals of different languages. This intuitively suggests that education is unaffected by these two variables. In both cases, the median education is relatively high, with the exception of a few outliers with a significantly lower value.
+- the median education is the same for men and for women (13 years), and very close
+for the different languages (13, 12.5, 13). Thus we can say that education is not
+affected by these two variables. In the two cases the median education is quite high,
+except a few outliers with a much lower value.
 
-- a similar argument applies to the `age` variable, although it is worth noticing that the median age of individuals of `other` language appears to be higher.
+- we can say the same thing for the `age` variable, but we can see that the median
+age of the people who speak an `other` language is higher (41 against 36).
 
-- there does not seem to be anything noteworth about the relationship between age and language. It can be noticed, however, that the split between male and female individuals seems almost equal, while the `language` variables is dominated by `English`.
+- there is nothing special about the relation between age and language. But we can
+see that the split between men and women is almost equal (2001 against 1986), while
+the `language` variable is dominated by `English` (3244 of `r nrow(SLID)`
+observations).
 
-To carry out a multiple linear regression analysis of $y$ on the covariates
-$x_1, \dots, x_p$ we need the following assumptions.
+We need the following assumptions on the data if we want to do a multiple linear
+regression analysis. With the notations of the module 2 notes, the model
+${\bf Y} = {\bf X}\boldsymbol{\beta} + \boldsymbol{\varepsilon}$ is a **classical
+linear model** if:
 
-* **Linearity and additivity.** The expected response is a linear function of the
-  regression parameters and the effects of the covariates add up:
-  $$y_i = \beta_0 + \beta_1 x_{i1} + \dots + \beta_k x_{ik} + \varepsilon_i,
-  \qquad i = 1, \dots, n,$$
-  or in matrix form $\mathbf{Y} = \mathbf{X}\boldsymbol{\beta} + \boldsymbol{\varepsilon}$
-  with $\mathrm{E}(\boldsymbol{\varepsilon}) = \mathbf{0}$.
+1. $\text{E}(\boldsymbol{\varepsilon}) = {\bf 0}$, so the relation between the
+response and the covariates is linear and additive:
+$$y_i = \beta_0 + \beta_1x_{i1} + \dots + \beta_kx_{ik} + \varepsilon_i, \qquad i = 1, \dots, n.$$
 
-* **Homoscedasticity.** The errors have a constant variance,
-  $\mathrm{Var}(\varepsilon_i) = \sigma^2$ for all $i$, which does not depend on the
-  covariates.
+2. $\text{Cov}(\boldsymbol{\varepsilon}) = \sigma^2{\bf I}$. This means that the
+errors are homoscedastic (they all have the same variance $\sigma^2$, which does not
+depend on the covariates) and that they are uncorrelated,
+$\text{Cov}(\varepsilon_i, \varepsilon_j) = 0$ for $i \neq j$.
 
-* **Uncorrelated errors.** $\mathrm{Cov}(\varepsilon_i, \varepsilon_j) = 0$ for
-  $i \neq j$, so that $\mathrm{Cov}(\boldsymbol{\varepsilon}) = \sigma^2 \mathbf{I}$.
+3. The design matrix has full rank, $\text{rank}({\bf X}) = k + 1 = p$. Without this
+we cannot invert ${\bf X}^T{\bf X}$ and $\hat{\boldsymbol{\beta}}$ is not unique.
 
-* **Full rank design.** The design matrix $\mathbf{X}$ has full column rank
-  $p < n$, so that $\mathbf{X}^\top\mathbf{X}$ is invertible and
-  $\hat{\boldsymbol{\beta}}$ is uniquely defined. The covariates are also assumed to
-  be fixed (measured without error).
+We get the classical **normal** linear model if we add
 
-* **Normality.** For the *normal* linear regression model we additionally assume
-  $\varepsilon_i \sim N(0, \sigma^2)$, independently. This is what makes the exact
-  $t$- and $F$-tests valid.
+4. $\boldsymbol{\varepsilon} \sim N_n({\bf 0}, \sigma^2{\bf I})$.
+
+If we write it in the GLM way, the same model says that the pairs $(Y_i, {\bf x}_i)$
+are independent with $Y_i \sim N(\mu_i, \sigma^2)$ (random component),
+$\eta_i = {\bf x}_i^T\boldsymbol{\beta}$ (systematic component) and the identity link
+$\mu_i = \eta_i$.
+
+We only need assumption 4 for the exact $t$- and $F$-tests. As `wages` is clearly
+skewed to the right, it is the assumption that we trust the least here, and this is
+one more reason to use the asymptotic $z$- and $\chi^2$-tests in Part 2.
 
 \newpage
 
@@ -159,14 +189,14 @@ summary.mylm(model2)
 ```
 
 **Interpretation of parameters:**
-* **Intercept ($\hat{\beta}_0 \approx -6.02$):** The expected hourly wage for a theoretical person with 0 years of education and an age of 0. This holds no physical meaning but anchors the regression plane.
-* **Education ($\hat{\beta}_1 \approx 0.90$):** Holding age constant, each additional year of education increases the expected hourly wage by 0.90 units. 
-* **Age ($\hat{\beta}_2 \approx 0.26$):** Holding education constant, each additional year of age increases the expected hourly wage by 0.26 units.
-* **Significance:** The $z$-tests for all variables yield p-values strictly close to 0, indicating that both education and age are highly significant predictors of wages.
+* **Intercept ($\hat{\beta}_0 \approx -6.02$):** The expected hourly wage for a theoretical person with 0 years of education and an age of 0. Even though this doesn't make much sense practically, it is consistent with the regression model.
+* **Education ($\hat{\beta}_1 \approx 0.90$):** This means that each additional year of education increases the hourly wage by 0.9, for equal age.
+* **Age ($\hat{\beta}_2 \approx 0.26$):** This means that each additional year of age increases the hourly wage by 0.26, for equal education. Thus, we can see that education is valued more highly than age in determining wages.
+* **Significance:** We can see from the summary that the p-values for age and education are far smaller than 5% (2.2e-16 for both), which means that age and education are highly significant predictors of wages.
 
 ## c) Simple vs. Multiple Regression Estimates
 
-The estimated parameter for `education` differs between the simple regression (Part 2) and the multiple regression (Part 3) due to **omitted variable bias** (confounding). 
+The estimated parameter for `education` is not the same in the simple regression and in the multiple regression, because of the **omitted variable bias**. In the simple model, the coefficient of `education` has to take both its own effect on wages and the effect of the variable that we forgot (`age`). This happens because `age` and `education` are correlated in our dataset.
 
 In the simple linear regression, the `education` coefficient absorbs both its direct effect on wages and the indirect effect of the omitted variable (`age`), since `age` and `education` are correlated (as seen in Part 1, $r = -0.106$). In the multiple linear regression, the coefficient isolates the **partial effect** of `education` on wages while explicitly controlling for `age`. 
 
