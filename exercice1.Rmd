@@ -67,14 +67,7 @@ $x_1, \dots, x_p$ we need the following assumptions.
 
 * **Normality.** For the *normal* linear regression model we additionally assume
   $\varepsilon_i \sim N(0, \sigma^2)$, independently. This is what makes the exact
-  $t$- and $F$-tests valid. It is not needed for $\hat{\boldsymbol{\beta}}$ to be
-  unbiased or for the least squares estimator to be BLUE (Gauss–Markov), and it is
-  not needed for the *asymptotic* $z$- and $\chi^2$-tests used in this exercise,
-  which only rely on a large sample size.
-
-Given the strong right-skewness of `wages` noted above, the normality assumption is
-the one most likely to be violated here — which is a further reason for preferring
-the asymptotic tests implemented in `mylm`.
+  $t$- and $F$-tests valid.
 
 \newpage
 
@@ -143,3 +136,52 @@ The coefficient of determination $R^2$ is **0.0936**.
 
 **Interpretation:** 
 Approximately **9.36%** of the total variability in hourly wages is explained by the variance in years of education. The remaining **90.64%** is unexplained by this model.
+
+
+
+# Part 3: Multiple linear regression
+
+## a) Fitting the multiple regression model
+
+Because our `mylm` and `print.mylm` functions were strictly implemented using generalized matrix operations (specifically $\hat{\beta} = (X^\top X)^{-1}X^\top Y$), they automatically adapt to any number of predictors. No changes to the underlying R functions are necessary to handle multiple linear regression.
+
+```{r multiple_model}
+model2 <- mylm(wages ~ education + age, data = SLID)
+print.mylm(model2)
+```
+
+## b) Estimates, standard errors, and z-test
+
+Similarly, our `summary.mylm` function uses the generalized covariance matrix formula $\hat{\sigma}^2(X^\top X)^{-1}$. Extracting the diagonal elements for the standard errors works flawlessly regardless of the model's dimensions.
+
+```{r summary_model2}
+summary.mylm(model2)
+```
+
+**Interpretation of parameters:**
+* **Intercept ($\hat{\beta}_0 \approx -6.02$):** The expected hourly wage for a theoretical person with 0 years of education and an age of 0. This holds no physical meaning but anchors the regression plane.
+* **Education ($\hat{\beta}_1 \approx 0.90$):** Holding age constant, each additional year of education increases the expected hourly wage by 0.90 units. 
+* **Age ($\hat{\beta}_2 \approx 0.26$):** Holding education constant, each additional year of age increases the expected hourly wage by 0.26 units.
+* **Significance:** The $z$-tests for all variables yield p-values strictly close to 0, indicating that both education and age are highly significant predictors of wages.
+
+## c) Simple vs. Multiple Regression Estimates
+
+The estimated parameter for `education` differs between the simple regression (Part 2) and the multiple regression (Part 3) due to **omitted variable bias** (confounding). 
+
+In the simple linear regression, the `education` coefficient absorbs both its direct effect on wages and the indirect effect of the omitted variable (`age`), since `age` and `education` are correlated (as seen in Part 1, $r = -0.106$). In the multiple linear regression, the coefficient isolates the **partial effect** of `education` on wages while explicitly controlling for `age`. 
+
+We can show these differences by running the individual models with `mylm` and comparing their coefficients:
+
+```{r compare_models}
+# Fit the individual simple regressions
+mod_edu <- mylm(wages ~ education, data = SLID)
+mod_age <- mylm(wages ~ age, data = SLID)
+
+# Display the isolated vs partial effects
+cat("Simple regression education effect:   ", mod_edu$coefficients["education"], "\n")
+cat("Simple regression age effect:         ", mod_age$coefficients["age"], "\n\n")
+
+cat("Multiple regression education effect: ", model2$coefficients["education"], "\n")
+cat("Multiple regression age effect:       ", model2$coefficients["age"], "\n")
+```
+```

@@ -15,7 +15,7 @@ mylm <- function(formula, data = list(), contrasts = NULL, ...){
   xtx_inv <- solve(t(X)%*% X)
   beta_hat <- xtx_inv %*% t(X) %*%y
   fitted_values <- X %*% beta_hat
-  res <- y- fitted_values
+  res <- drop(y- fitted_values)
 
   sse <- sum(res^2)
   sst <- sum((y-mean(y))^2)
@@ -24,7 +24,7 @@ mylm <- function(formula, data = list(), contrasts = NULL, ...){
   r_squared <- 1 - (sse / sst)
 
   est <- list(terms = terms, model = mf)
-  est$coefficients <- beta_hat
+  est$coefficients <- drop(beta_hat)
   est$fitted.values <- fitted_values
   est$residuals <- res
   est$df.residual <- df
@@ -50,7 +50,7 @@ print.mylm <- function(object, ...){
   cat('\nCall:\n')
   print(object$call)
   cat('\nCoefficients:\n')
-  print(t(object$coefficients))
+  print(object$coefficients)
 }
 
 summary.mylm <- function(object, ...){
