@@ -1,0 +1,231 @@
+---
+title : " TMA4315 Exercise 1 Linear models for Gaussian data "
+author : " Thomas Guillot , Lucas Paraveman , Dario Mazotti "
+output:
+  pdf_document:
+    toc: true
+  html_document:
+    toc: true
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE , message = FALSE)
+source("R/mylm.R")
+library(mylm)
+library(GGally)
+library(ggplot2)
+```
+
+#Part 1: Explanatory analysis of the dataset First of all we import the dataset and prepare the data for the analysis
+
+```{r}
+library(car)
+data(SLID, package = "carData")
+SLID <- SLID[complete.cases(SLID), ]
+```
+
+Afterwards we draw the draw a matrix of diagnostic plots of all the variables
+
+```{r}
+ggpairs(SLID, lower = list(continuous = wrap("points", alpha = 0.3, size=0.5)))
+```
+
+Looking at the plot, there appear to be some noteworthy relationships between pairs of variables:
+
+- `education` and `wages` have a moderate positive correlation of 0.306 that is, however, highly statistically significant. The same applies to `age` and `wages`.
+
+- median wages are noticeably higher for male individuals compared to females, while they are effectively the same in relation to the language. This suggests that an individual's gender might be strongly related with their wage, while their language has a likely much weaker effect. In both cases, however, we can see that most wages are concentrated towards relatively low values, with the exception of a few, much higher outliers. This is further confirmed by observing the `wages` density plot, which is skewed to the right.
+
+- `age` and `education` have a very weak, but highly statistically significant, negative correlation of -0.106. This means that these two variables are most likely uncorrelated.
+
+- median education is effectively the same for male and female individuals, and very similar for individuals of different languages. This intuitively suggests that education is unaffected by these two variables. In both cases, the median education is relatively high, with the exception of a few outliers with a significantly lower value.
+
+- a similar argument applies to the `age` variable, although it is worth noticing that the median age of individuals of `other` language appears to be higher.
+
+- there does not seem to be anything noteworth about the relationship between age and language. It can be noticed, however, that the split between male and female individuals seems almost equal, while the `language` variables is dominated by `English`.
+
+To carry out a multiple linear regression analysis of $y$ on the covariates
+$x_1, \dots, x_p$ we need the following assumptions.
+
+* **Linearity and additivity.** The expected response is a linear function of the
+  regression parameters and the effects of the covariates add up:
+  $$y_i = \beta_0 + \beta_1 x_{i1} + \dots + \beta_k x_{ik} + \varepsilon_i,
+  \qquad i = 1, \dots, n,$$
+  or in matrix form $\mathbf{Y} = \mathbf{X}\boldsymbol{\beta} + \boldsymbol{\varepsilon}$
+  with $\mathrm{E}(\boldsymbol{\varepsilon}) = \mathbf{0}$.
+
+* **Homoscedasticity.** The errors have a constant variance,
+  $\mathrm{Var}(\varepsilon_i) = \sigma^2$ for all $i$, which does not depend on the
+  covariates.
+
+* **Uncorrelated errors.** $\mathrm{Cov}(\varepsilon_i, \varepsilon_j) = 0$ for
+  $i \neq j$, so that $\mathrm{Cov}(\boldsymbol{\varepsilon}) = \sigma^2 \mathbf{I}$.
+
+* **Full rank design.** The design matrix $\mathbf{X}$ has full column rank
+  $p < n$, so that $\mathbf{X}^\top\mathbf{X}$ is invertible and
+  $\hat{\boldsymbol{\beta}}$ is uniquely defined. The covariates are also assumed to
+  be fixed (measured without error).
+
+* **Normality.** For the *normal* linear regression model we additionally assume
+  $\varepsilon_i \sim N(0, \sigma^2)$, independently. This is what makes the exact
+  $t$- and $F$-tests valid. It is not needed for $\hat{\boldsymbol{\beta}}$ to be
+  unbiased or for the least squares estimator to be BLUE (Gauss–Markov), and it is
+  not needed for the *asymptotic* $z$- and $\chi^2$-tests used in this exercise,
+  which only rely on a large sample size.
+
+Given the strong right-skewness of `wages` noted above, the normality assumption is
+the one most likely to be violated here — which is a further reason for preferring
+the asymptotic tests implemented in `mylm`.
+
+\newpage
+
+# Part 2: Linear regression with the mylm package
+
+## Statistical Formulas and Theory
+
+The `mylm` package implements ordinary least squares (OLS) for a linear model $Y = X\beta + \varepsilon$. The functions in the package are built upon the following formulas:
+
+- **Coefficient estimates:** $\hat{\beta} = (X^\top X)^{-1} X^\top Y$
+- **Fitted values:** $\hat{Y} = X\hat{\beta}$
+- **Residuals:** $e = Y - \hat{Y}$
+- **Residual Sum of Squares (SSE):** $SSE = e^\top e$
+- **Degrees of Freedom (df):** $df = n - p$ (where $p$ is the number of parameters).
+- **Total Sum of Squares (SST):** $SST = \sum (y_i - \bar{y})^2$
+- **Covariance matrix:** $\widehat{\text{Cov}}(\hat{\beta}) = \hat{\sigma}^2 (X^\top X)^{-1}$, with $\hat{\sigma}^2 = \frac{SSE}{n-p}$
+- **Standard Errors (SE):** $\text{SE}(\hat{\beta}_j) = \sqrt{\widehat{\text{Cov}}(\hat{\beta})_{jj}}$
+- **Asymptotic z-test:** $z_j = \frac{\hat{\beta}_j}{\text{SE}(\hat{\beta}_j)}$ with p-value $2\Phi(-|z_j|)$.
+- **Asymptotic** $\chi^2$-test: $\chi^2 = \frac{SSE_{\text{reduced}} - SSE_{\text{full}}}{\hat{\sigma}^2_{\text{full}}}$
+- **Coefficient of determination:** $R^2 = 1 - \frac{SSE}{SST}$
+
+## a) & b) Fitting the model and calculating standard errors
+
+We fit a simple linear regression model to the data with `wages` as the response and `education` as the predictor.
+
+```{r simple_model}
+model1 <- mylm(wages ~ education, data = SLID)
+model1b <- lm(wages ~ education, data = SLID)
+
+print.mylm(model1)
+print(model1b)
+```
+
+The output confirms that our `mylm` function yields the exact same coefficient estimates as the standard `lm` function.
+
+```{r summary_model}
+summary.mylm(model1)
+```
+
+**Interpretation of parameters:**
+* **Intercept ($\hat{\beta}_0 \approx 4.97$):** The expected hourly wage for a person with 0 years of education. This is extrapolated outside the data range and holds no practical meaning since wages cannot be negative.
+* **Education ($\hat{\beta}_1 \approx 0.79$):** For each additional year of education, the expected hourly wage increases by 0.79 units.
+* **Significance (z-test):** The $z$-value for education is 20.28, yielding a p-value strictly close to 0. We confidently reject the null hypothesis ($H_0: \beta_1 = 0$); education is a highly significant predictor.
+
+## c) Residuals plot
+
+```{r plot_model, fig.width=6, fig.height=4}
+plot.mylm(model1)
+```
+
+**Comment on the plot:** 
+The residuals versus fitted values plot shows a funnel shape, meaning the variance of the residuals increases as the fitted values increase. This violates the assumption of homoscedasticity. 
+
+## d) ANOVA and Chi-squared test 
+
+```{r anova_model}
+results_anova <- anova.mylm(model1)
+```
+
+**Relationship between tests:** 
+In simple linear regression, the $\chi^2$ statistic with 1 degree of freedom is equal to the square of the $z$-statistic for the slope coefficient. From our summary, $z \approx 20.284$, and $z^2 \approx 411.45$, matching the $\chi^2$ value in the ANOVA table. The critical value for a 5% significance level is $z_{0.025} \approx 1.96$ and $\chi^2_{1, 0.05} \approx 3.84$.
+
+## e) Coefficient of determination ($R^2$)
+
+The coefficient of determination $R^2$ is **0.0936**. 
+
+**Interpretation:** 
+Approximately **9.36%** of the total variability in hourly wages is explained by the variance in years of education. The remaining **90.64%** is unexplained by this model.
+
+# Part 4: Testing the mylm package
+
+
+## Model 4
+
+---
+\textbf{COMPARING PRINT OUTPUT}
+---
+
+```{r test_fits_model4_print, comment = ""}
+
+model4 <- mylm(wages ~ sex + age + language + I(education^2), data = SLID)
+model4b <- lm(wages ~ sex + age + language + I(education^2), data = SLID)
+
+
+print.mylm(model4)
+print(model4b)
+```
+---
+\textbf{COMPARING SUMMARY OUTPUT}
+---
+```{r test_fits_model4_summary, comment = ""}
+
+summary.mylm(model4)
+summary(model4b)
+```
+We can see that `sexMale` is very positively correlated to `wages`, and this correlation is highly statistically significant, as its p-value is extremely small (less than 2.2e-16). On the other hand, `age` and `education^2` seem to have a very slight positive correlation with `wages`, as they have small positive coefficients. This is supported by the fact that their p-value is less than 2.2e-16, meaning that these estimates are statistically significant. Finally, `languageFrench` and `languageOther` appear to be slightly negatively correlated to `wages`. However, given the high p-values of these estimates, we can't say with certainty if they are a result of random chance or noise.
+Since the coefficient of determination is around 0.3, we can conclude that this model explains about 30% of the variance of the dependent variable.
+Based on these results, we can conclude with relative confidence that a male individual is expected to earn about \$3.41 dollars per hour more than the female equivalent, with `female` being the baseline for the `sex` variable. At the same time, every year of age corresponds to an increase of around \$0.25 dollars per hour, while the `education^2` coefficient indicates that there is a non-linear effect (similar to an acceleration) of education on wages.
+A possible change to the model could be the inclusion of the `education` parameter,in addition to the second order term, to have a more complete understanding of the effect of this variable on `wages`.
+
+## Model 5
+
+---
+\textbf{COMPARING PRINT OUTPUT}
+---
+```{r test_fits_model5_print, comment = ""}
+
+model5 <- mylm(wages ~ language * age, data = SLID)
+model5b <- lm(wages ~ language * age, data = SLID)
+
+print.mylm(model5)
+print(model5b)
+```
+
+---
+\textbf{COMPARING SUMMARY OUTPUT}
+---
+
+```{r test_fits_model5_summary, comment = ""}
+
+summary.mylm(model5)
+summary(model5b)
+```
+Just like in the previous model, `age` is extremely statistically significant and lightly positively correlated to`wages`. The interaction term  `languageFrench:age` is also statistically significant, although less than `age`, and it shows a slightly negative coefficient. All the other terms, besides the intercept, are not statistically significant. The coefficient of determination here is about 0.13, meaning that this model only explains around 13% of the variance of the `wages` variable.
+Due to the presence of the interaction between `age` and `language` in the call, `age` now represents the wage increase per year of age for English speakers, `languageEnglish` being the baseline for the `language` variable. This means that `languageFrench` has a slightly weaker effect on `wages` than `languageEnglish`: a French speaker's wage increases less than an English speaker's for each year of age` (specifically, \$0.08 less).
+One possible way to improve the model would be to compare it to a simpler model such as `mylm(formula = wages ~ language + age, data = SLID)`. Since most interaction terms seem to be weakly significant or not significant at all, it could be interesting to see if a simpler model is able to explain the data just as well as the current one. Alternatively, we could center the `age` variable in its mean, since wages at very low ages have little statistical meaning.
+
+## Model 6
+
+---
+\textbf{COMPARING PRINT OUTPUT}
+---
+
+```{r test_fits_model6_print, comment = ""}
+
+model6 <- mylm(wages ~ education - 1, data = SLID)
+model6b <- lm(wages ~ education - 1, data = SLID)
+
+print.mylm(model6)
+print(model6b)
+```
+
+---
+\textbf{COMPARING SUMMARY OUTPUT}
+---
+
+```{r test_fits_model6_summary, comment = ""}
+
+summary.mylm(model6)
+summary(model6b)
+```
+The `education` coefficient is highly statistically significant, as its p-value is less than 2.2e-16, and it has a positive effect on`wages`. Because the intercept was removed, this model's regression line passes through the origin. This can be interpreted as the model assuming that someone with 0 years of education earns exactly \$0.00 per hour. Since the `education` coefficient is almost 1.15, we can say that, according to this model, a person's hourly wage is expected to increase by about \$1.15 for each year of education they have.
+Clearly, however, removing the intercept from the model represents a very strong assumption: people with no education earn \$0.00 per hour. Clearly, this makes little logical sense in the real world, which means that this assumption is certainly wrong and the model can be improved by simply reinserting the intercept. Moreover, the R-squared is not defined when the intercept is removed, which is another reason to keep it in this case.

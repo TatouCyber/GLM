@@ -13,7 +13,7 @@ mylm <- function(formula, data = list(), contrasts = NULL, ...){
   # and store the results in the list est
   df <- nrow(X) - ncol(X)
   xtx_inv <- solve(t(X)%*% X)
-  beta_hat <- xtx_inv %*% t(X) %*%y
+  beta_hat <- drop(xtx_inv %*% t(X) %*%y)
   fitted_values <- X %*% beta_hat
   res <- y- fitted_values
 
@@ -50,7 +50,7 @@ print.mylm <- function(object, ...){
   cat('\nCall:\n')
   print(object$call)
   cat('\nCoefficients:\n')
-  print(t(object$coefficients))
+  print(object$coefficients)
 }
 
 summary.mylm <- function(object, ...){
