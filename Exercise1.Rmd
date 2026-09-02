@@ -1,6 +1,8 @@
 ---
 title : " TMA4315 Exercise 1 Linear models for Gaussian data "
+subtitle: Group 14
 author : " Thomas Guillot , Lucas Paraveman , Dario Mazotti "
+
 output:
   pdf_document:
     toc: true
@@ -16,7 +18,9 @@ library(GGally)
 library(ggplot2)
 ```
 
-#Part 1: Explanatory analysis of the dataset First of all we import the dataset and prepare the data for the analysis
+# Part 1: Explanatory analysis of the dataset
+
+First of all we import the dataset and prepare the data for the analysis.
 
 ```{r}
 library(car)
@@ -24,13 +28,13 @@ data(SLID, package = "carData")
 SLID <- SLID[complete.cases(SLID), ]
 ```
 
-Afterwards we draw the draw a matrix of diagnostic plots of all the variables
+Afterwards we draw a matrix of diagnostic plots of all the variables.
 
 ```{r}
 ggpairs(SLID, lower = list(continuous = wrap("points", alpha = 0.3, size=0.5)))
 ```
 
-Looking at the plot, there appear to be some noteworthy relationships between pairs of variables:
+Looking at the plot, there appear to be some noteworthy relationships between various pairs of variables:
 
 - `education` and `wages` have a moderate positive correlation of 0.306 that is, however, highly statistically significant. The same applies to `age` and `wages`.
 
@@ -68,16 +72,13 @@ $x_1, \dots, x_p$ we need the following assumptions.
 
 * **Normality.** For the *normal* linear regression model we additionally assume
   $\varepsilon_i \sim N(0, \sigma^2)$, independently. This is what makes the exact
-  $t$- and $F$-tests valid. It is not needed for $\hat{\boldsymbol{\beta}}$ to be
-  unbiased or for the least squares estimator to be BLUE (Gauss–Markov), and it is
-  not needed for the *asymptotic* $z$- and $\chi^2$-tests used in this exercise,
+  $t$- and $F$-tests valid. Importantly, it is not needed for $\hat{\boldsymbol{\beta}}$ to be
+  unbiased or for the *asymptotic* $z$- and $\chi^2$-tests used in this assignment,
   which only rely on a large sample size.
 
 Given the strong right-skewness of `wages` noted above, the normality assumption is
-the one most likely to be violated here — which is a further reason for preferring
+the one most likely to be violated here, which is a further reason for preferring
 the asymptotic tests implemented in `mylm`.
-
-\newpage
 
 # Part 2: Linear regression with the mylm package
 
@@ -129,14 +130,40 @@ plot.mylm(model1)
 **Comment on the plot:** 
 The residuals versus fitted values plot shows a funnel shape, meaning the variance of the residuals increases as the fitted values increase. This violates the assumption of homoscedasticity. 
 
-## d) ANOVA and Chi-squared test 
+## d) ANOVA and Chi-squared test
+
+```{r stats_2d}
+cat(sprintf(
+  "SSE: %.2f\nDegrees of freedom: %d\nSST: %.2f",
+  model1$sse, model1$df.residual, model1$sst
+))
+```
+```{r individual_tests_2d}
+sse_full <- model1$sse
+df_full <- model1$df.residual
+sst <- model1$sst
+
+base_model <- mylm(wages ~ 1, data = SLID)
+df_diff <- base_model$df.residual - model1$df.residual
+
+chisq_val <- (sst - sse_full) / (sse_full / df_full)
+p_val <- pchisq(chisq_val, df = df_diff, lower.tail = FALSE)
+
+rm(base_model)
+
+cat(sprintf(
+  "SSE: %.2f\nDegrees of freedom: %d\nSST: %.2f\nTest degrees of freedom: %d\nChi-squared: %.2f\np-value: %e\n",
+  sse_full, df_full, sst, df_diff, chisq_val, p_val
+))
+```
+**Relationship between tests:** 
+In simple linear regression, the $\chi^2$ statistic with 1 degree of freedom is equal to the square of the $z$-statistic for the slope coefficient. From our summary, $z \approx 20.284$, and $z^2 \approx 411.45$, matching the $\chi^2$ value in the ANOVA table. The critical value for a 5% significance level is $z_{0.025} \approx 1.96$ and $\chi^2_{1, 0.05} \approx 3.84$, which our statistics comfortably exceed.
 
 ```{r anova_model}
 results_anova <- anova.mylm(model1)
+anova(model1b)
 ```
-
-**Relationship between tests:** 
-In simple linear regression, the $\chi^2$ statistic with 1 degree of freedom is equal to the square of the $z$-statistic for the slope coefficient. From our summary, $z \approx 20.284$, and $z^2 \approx 411.45$, matching the $\chi^2$ value in the ANOVA table. The critical value for a 5% significance level is $z_{0.025} \approx 1.96$ and $\chi^2_{1, 0.05} \approx 3.84$.
+Finally, if we pass the model to our anova.mylm() function, it produces a sequential `ANOVA` table that matches the previous calculations. It displays the same 1 degree of freedom, Sum of Squares ($23096.20$), and asymptotic $\chi^2$ test statistic ($411.45$), confirming that our implementation works correctly.
 
 ## e) Coefficient of determination ($R^2$)
 
@@ -144,6 +171,56 @@ The coefficient of determination $R^2$ is **0.0936**.
 
 **Interpretation:** 
 Approximately **9.36%** of the total variability in hourly wages is explained by the variance in years of education. The remaining **90.64%** is unexplained by this model.
+
+# Part 3: Multiple linear regression
+
+## a) Fitting the multiple regression model
+
+Because our `mylm` and `print.mylm` functions were strictly implemented using generalized matrix operations (specifically $\hat{\beta} = (X^\top X)^{-1}X^\top Y$), they automatically adapt to any number of predictors. No changes to the underlying R functions are necessary to handle multiple linear regression.
+
+```{r multiple_model}
+model2 <- mylm(wages ~ education + age, data = SLID)
+print.mylm(model2)
+```
+
+## b) Estimates, standard errors, and z-test
+
+Similarly, our `summary.mylm` function uses the generalized covariance matrix formula $\hat{\sigma}^2(X^\top X)^{-1}$. Extracting the diagonal elements for the standard errors works flawlessly regardless of the model's dimensions.
+
+```{r summary_model2}
+summary.mylm(model2)
+```
+
+**Interpretation of parameters:**
+
+* **Intercept ($\hat{\beta}_0 \approx -6.02$):** The expected hourly wage for a theoretical person with 0 years of education and an age of 0. Even though this doesn't make much sense practically, it is consistent with the regression model.
+
+* **Education ($\hat{\beta}_1 \approx 0.90$):** This means that each additional year of education increases the hourly wage by 0.9, for equal age.
+
+* **Age ($\hat{\beta}_2 \approx 0.26$):** This means that each additional year of age increases the hourly wage by 0.26, for equal education. Thus, we can see that education is valued more highly than age in determining wages.
+
+* **Significance:** We can see from the summary that the p-values for age and education are far smaller than 5% (2.2e-16 for both), which means that age and education are highly significant predictors of wages.
+
+## c) Simple vs. Multiple Regression Estimates
+
+The estimated parameter for `education` is not the same in the simple regression and in the multiple regression, because of the **omitted variable bias**. In the simple model, the coefficient of `education` has to take both its own effect on wages and the effect of the variable that we forgot (`age`). This happens because `age` and `education` are correlated in our dataset.
+
+In the simple linear regression, the `education` coefficient absorbs both its direct effect on wages and the indirect effect of the omitted variable (`age`), since `age` and `education` are correlated (as seen in Part 1, $r = -0.106$). In the multiple linear regression, the coefficient isolates the **partial effect** of `education` on wages while explicitly controlling for `age`. 
+
+We can show these differences by running the individual models with `mylm` and comparing their coefficients:
+
+```{r compare_models}
+# Fit the individual simple regressions
+mod_edu <- mylm(wages ~ education, data = SLID)
+mod_age <- mylm(wages ~ age, data = SLID)
+
+# Display the isolated vs partial effects
+cat("Simple regression education effect:   ", mod_edu$coefficients["education"], "\n")
+cat("Simple regression age effect:         ", mod_age$coefficients["age"], "\n\n")
+
+cat("Multiple regression education effect: ", model2$coefficients["education"], "\n")
+cat("Multiple regression age effect:       ", model2$coefficients["age"], "\n")
+```
 
 # Part 4: Testing the mylm package
 
@@ -154,7 +231,7 @@ Approximately **9.36%** of the total variability in hourly wages is explained by
 \textbf{COMPARING PRINT OUTPUT}
 ---
 
-```{r test_fits_model4_print, comment = ""}
+```{r test_fits_model4_print}
 
 model4 <- mylm(wages ~ sex + age + language + I(education^2), data = SLID)
 model4b <- lm(wages ~ sex + age + language + I(education^2), data = SLID)
@@ -163,16 +240,32 @@ model4b <- lm(wages ~ sex + age + language + I(education^2), data = SLID)
 print.mylm(model4)
 print(model4b)
 ```
+
 ---
 \textbf{COMPARING SUMMARY OUTPUT}
 ---
-```{r test_fits_model4_summary, comment = ""}
+```{r test_fits_model4_summary}
 
 summary.mylm(model4)
 summary(model4b)
 ```
-We can see that `sexMale` is very positively correlated to `wages`, and this correlation is highly statistically significant, as its p-value is extremely small (less than 2.2e-16). On the other hand, `age` and `education^2` seem to have a very slight positive correlation with `wages`, as they have small positive coefficients. This is supported by the fact that their p-value is less than 2.2e-16, meaning that these estimates are statistically significant. Finally, `languageFrench` and `languageOther` appear to be slightly negatively correlated to `wages`. However, given the high p-values of these estimates, we can't say with certainty if they are a result of random chance or noise.
+---
+\textbf{MODEL PLOT}
+---
+
+```{r test_fits_model4_plot}
+
+plot.mylm(model4, title = "Model 4: Residuals vs Fitted Values")
+```
+
+
+---
+\textbf{COMMENT}
+---
+
+From the model's summary, we can see that `sexMale` is very positively correlated to `wages`, and this correlation is highly statistically significant, as its p-value is extremely small (less than 2.2e-16). On the other hand, `age` and `education^2` seem to have a very slight positive correlation with `wages`, as they have small positive coefficients. This is supported by the fact that their p-value is less than 2.2e-16, meaning that these estimates are statistically significant. Finally, `languageFrench` and `languageOther` appear to be slightly negatively correlated to `wages`. However, given the high p-values of these estimates, we can't say with certainty if they are a result of random chance or noise.
 Since the coefficient of determination is around 0.3, we can conclude that this model explains about 30% of the variance of the dependent variable.
+The plot clearly shows that the assumption of homoscedasticity does not hold.
 Based on these results, we can conclude with relative confidence that a male individual is expected to earn about \$3.41 dollars per hour more than the female equivalent, with `female` being the baseline for the `sex` variable. At the same time, every year of age corresponds to an increase of around \$0.25 dollars per hour, while the `education^2` coefficient indicates that there is a non-linear effect (similar to an acceleration) of education on wages.
 A possible change to the model could be the inclusion of the `education` parameter,in addition to the second order term, to have a more complete understanding of the effect of this variable on `wages`.
 
@@ -181,7 +274,8 @@ A possible change to the model could be the inclusion of the `education` paramet
 ---
 \textbf{COMPARING PRINT OUTPUT}
 ---
-```{r test_fits_model5_print, comment = ""}
+
+```{r test_fits_model5_print}
 
 model5 <- mylm(wages ~ language * age, data = SLID)
 model5b <- lm(wages ~ language * age, data = SLID)
@@ -194,13 +288,27 @@ print(model5b)
 \textbf{COMPARING SUMMARY OUTPUT}
 ---
 
-```{r test_fits_model5_summary, comment = ""}
+```{r test_fits_model5_summary}
 
 summary.mylm(model5)
 summary(model5b)
 ```
+---
+\textbf{MODEL PLOT}
+---
+
+```{r test_fits_model5_plot}
+
+plot.mylm(model5, title = "Model 5: Residuals vs Fitted Values")
+```
+
+---
+\textbf{COMMENT}
+---
+
 Just like in the previous model, `age` is extremely statistically significant and lightly positively correlated to`wages`. The interaction term  `languageFrench:age` is also statistically significant, although less than `age`, and it shows a slightly negative coefficient. All the other terms, besides the intercept, are not statistically significant. The coefficient of determination here is about 0.13, meaning that this model only explains around 13% of the variance of the `wages` variable.
-Due to the presence of the interaction between `age` and `language` in the call, `age` now represents the wage increase per year of age for English speakers, `languageEnglish` being the baseline for the `language` variable. This means that `languageFrench` has a slightly weaker effect on `wages` than `languageEnglish`: a French speaker's wage increases less than an English speaker's for each year of age` (specifically, \$0.08 less).
+Due to the presence of the interaction between `age` and `language` in the call, `age` now represents the wage increase per year of age for English speakers, `languageEnglish` being the baseline for the `language` variable. This means that `languageFrench` has a slightly weaker effect on `wages` than `languageEnglish`: a French speaker's wage increases less than an English speaker's for each year of age (specifically, \$0.08 less).
+Once again, the plot shows that homoscedasticity does not hold.
 One possible way to improve the model would be to compare it to a simpler model such as `mylm(formula = wages ~ language + age, data = SLID)`. Since most interaction terms seem to be weakly significant or not significant at all, it could be interesting to see if a simpler model is able to explain the data just as well as the current one. Alternatively, we could center the `age` variable in its mean, since wages at very low ages have little statistical meaning.
 
 ## Model 6
@@ -209,7 +317,7 @@ One possible way to improve the model would be to compare it to a simpler model 
 \textbf{COMPARING PRINT OUTPUT}
 ---
 
-```{r test_fits_model6_print, comment = ""}
+```{r test_fits_model6_print}
 
 model6 <- mylm(wages ~ education - 1, data = SLID)
 model6b <- lm(wages ~ education - 1, data = SLID)
@@ -222,10 +330,172 @@ print(model6b)
 \textbf{COMPARING SUMMARY OUTPUT}
 ---
 
-```{r test_fits_model6_summary, comment = ""}
+```{r test_fits_model6_summary}
 
 summary.mylm(model6)
 summary(model6b)
 ```
-The `education` coefficient is highly statistically significant, as its p-value is less than 2.2e-16, and it has a positive effect on`wages`. Because the intercept was removed, this model's regression line passes through the origin. This can be interpreted as the model assuming that someone with 0 years of education earns exactly \$0.00 per hour. Since the `education` coefficient is almost 1.15, we can say that, according to this model, a person's hourly wage is expected to increase by about \$1.15 for each year of education they have.
+---
+\textbf{MODEL PLOT}
+---
+
+```{r test_fits_model6_plot}
+
+plot.mylm(model6, title = "Model 6: Residuals vs Fitted Values")
+```
+
+---
+\textbf{COMMENT}
+---
+
+The `education` coefficient is highly statistically significant, as its p-value is less than 2.2e-16, and it has a positive effect on `wages`. Because the intercept was removed, this model's regression line passes through the origin. This can be interpreted as the model assuming that someone with 0 years of education earns exactly \$0.00 per hour. Since the `education` coefficient is almost 1.15, we can say that, according to this model, a person's hourly wage is expected to increase by about \$1.15 for each year of education they have.
+Once again, the plot shows that the homoscedasticity assumption does not hold.
 Clearly, however, removing the intercept from the model represents a very strong assumption: people with no education earn \$0.00 per hour. Clearly, this makes little logical sense in the real world, which means that this assumption is certainly wrong and the model can be improved by simply reinserting the intercept. Moreover, the R-squared is not defined when the intercept is removed, which is another reason to keep it in this case.
+
+## Final considerations and possible improvements
+All three of these models suffer from two common issues: the lack of homoscedasticity and the right-skewness of `wages`, which is a symptom of the fact that the errors are likely not normally distributed. These problems can hardly be addressed just by modifying the models' linear structure. A better option would be to modify the dataset by applying some specific transformations. One option would be to replace`wages` with`log(wages)`, which could fix the right-skewness of the variable and, possibly, the lack of homoscedasticity of the residuals. However, an even more robust alternative is applying a Box-Cox transformation to the response variable. These transformations are commonly used to correct skewed data and often stabilize the variance of the residuals, allowing the homoscedasticity assumption to be satisfied.
+
+\newpage
+
+# Appendix
+
+## mylm.R
+
+```{r, eval = FALSE}
+# Select Build, Build and reload to build and lode into the R-session.
+
+mylm <- function(formula, data = list(), contrasts = NULL, ...){
+  # Extract model matrix & responses
+  mf <- model.frame(formula = formula, data = data)
+  X  <- model.matrix(attr(mf, "terms"), data = mf, contrasts.arg = contrasts)
+  y  <- model.response(mf)
+  terms <- attr(mf, "terms")
+
+
+  # Add code here to calculate coefficients, residuals, fitted values, etc...
+  # and store the results in the list est
+  df <- nrow(X) - ncol(X)
+  xtx_inv <- solve(t(X)%*% X)
+  beta_hat <- drop(xtx_inv %*% t(X) %*%y)
+  fitted_values <- X %*% beta_hat
+  res <- y- fitted_values
+
+  sse <- sum(res^2)
+  sst <- sum((y-mean(y))^2)
+  sigma2 <- sse / df
+  vcov_mat <- as.numeric(sigma2) * xtx_inv
+  r_squared <- 1 - (sse / sst)
+
+  est <- list(terms = terms, model = mf)
+  est$coefficients <- beta_hat
+  est$fitted.values <- fitted_values
+  est$residuals <- res
+  est$df.residual <- df
+  est$sse <- as.numeric(sse)
+  est$sst <- as.numeric(sst)
+  est$vcov <- vcov_mat
+  est$r.squared <- as.numeric(r_squared)
+
+  # Store call and formula used
+  est$call <- match.call()
+  est$formula <- formula
+
+  # Set class name. This is very important!
+  class(est) <- 'mylm'
+
+  # Return the object with all results
+  return(est)
+}
+
+print.mylm <- function(object, ...){
+  # Code here is used when print(object) is used on objects of class "mylm"
+  # Useful functions include cat, print.default and format
+  cat('\nCall:\n')
+  print(object$call)
+  cat('\nCoefficients:\n')
+  print(object$coefficients)
+}
+
+summary.mylm <- function(object, ...){
+  # Code here is used when summary(object) is used on objects of class "mylm"
+  # Useful functions include cat, print.default and format
+  cat('Summary of object\n')
+  se <- sqrt(diag(object$vcov))
+  z_val <- object$coefficients / se
+  p_val <- 2 * pnorm(-abs(z_val))
+  coef_table <- cbind(Estimate = object$coefficients, `Std. Error` = se, `z value` = z_val, `Pr(>|z|)` = p_val)
+  cat('\nCall:\n')
+  print(object$call)
+  cat('\nCoefficients:\n')
+  printCoefmat(coef_table, P.values = TRUE, has.Pvalue = TRUE)
+  cat(sprintf('\nMultiple R-squared:  %f\n', object$r.squared))
+}
+
+plot.mylm <- function(object, title = "Residuals vs Fitted Values",...){
+  # Code here is used when plot(object) is used on objects of class "mylm"
+  library(ggplot2)
+  df_plot <- data.frame(fitted = object$fitted.values, residuals = object$residuals)
+
+  p <- ggplot(df_plot, aes(x = fitted, y = residuals)) +
+    geom_point(alpha = 0.5) +
+    geom_hline(yintercept = 0, col = "red", linetype = "dashed") + theme_minimal() +
+    labs(title = title, x = "Fitted values", y = "Raw residuals") +
+    theme(plot.title = element_text(hjust = 0.5))
+  print(p)
+}
+
+
+
+# This part is optional! You do not have to implement anova
+anova.mylm <- function(object, ...){
+  # Code here is used when anova(object) is used on objects of class "mylm"
+
+  # Components to test
+  comp <- attr(object$terms, "term.labels")
+
+  # Name of response
+  response <- deparse(object$terms[[2]])
+
+  # Fit the sequence of models
+  txtFormula <- paste(response, "~", sep = "")
+  model <- list()
+  for(numComp in 1:length(comp)){
+    if(numComp == 1){
+      txtFormula <- paste(txtFormula, comp[numComp])
+    }
+    else{
+      txtFormula <- paste(txtFormula, comp[numComp], sep = "+")
+    }
+    formula <- formula(txtFormula)
+    model[[numComp]] <- mylm(formula = formula, data = object$model)
+  }
+
+  # Print Analysis of Variance Table
+  cat('Analysis of Variance Table\n')
+  cat(c('Response: ', response, '\n'), sep = '')
+  cat('          Df  Sum sq X2 value Pr(>X2)\n')
+  base_formula <- formula(paste(response, "~ 1"))
+  base_model <- mylm(formula = base_formula, data = object$model)
+  prev_sse <- base_model$sse
+  prev_df <- base_model$df.residual
+  for(numComp in 1:length(comp)){
+    # Add code to print the line for each model tested
+    curr_sse <- model[[numComp]]$sse
+    curr_df <- model[[numComp]]$df.residual
+
+    df_diff <- prev_df - curr_df
+    ss_diff <- prev_sse - curr_sse
+
+    chisq_val <- ss_diff / (object$sse / object$df.residual)
+    p_val <- pchisq(chisq_val, df = df_diff, lower.tail = FALSE)
+
+    cat(sprintf("%-9s %-3d %-7.2f %-8.2f %-8.4e\n",
+                comp[numComp], df_diff, ss_diff, chisq_val, p_val))
+
+    prev_sse <- curr_sse
+    prev_df <- curr_df
+  }
+
+  return(model)
+
+}

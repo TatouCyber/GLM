@@ -68,15 +68,16 @@ summary.mylm <- function(object, ...){
   cat(sprintf('\nMultiple R-squared:  %f\n', object$r.squared))
 }
 
-plot.mylm <- function(object, ...){
+plot.mylm <- function(object, title = "Residuals vs Fitted Values",...){
   # Code here is used when plot(object) is used on objects of class "mylm"
-  library(ggplot2)
-  labs(title = "Residuals vs Fitted Values", x = "Fitted values", y = "Raw residuals")
   library(ggplot2)
   df_plot <- data.frame(fitted = object$fitted.values, residuals = object$residuals)
 
-  p <- ggplot(df_plot, aes(x = fitted, y = residuals)) + geom_point(alpha = 0.5) + geom_hline(yintercept = 0, col = "red", linetype = "dashed") + theme_minimal() +
-    labs(title = "Residuals vs Fitted Values", x = "Fitted values", y = "Raw residuals")
+  p <- ggplot(df_plot, aes(x = fitted, y = residuals)) +
+    geom_point(alpha = 0.5) +
+    geom_hline(yintercept = 0, col = "red", linetype = "dashed") + theme_minimal() +
+    labs(title = title, x = "Fitted values", y = "Raw residuals") +
+    theme(plot.title = element_text(hjust = 0.5))
   print(p)
 }
 
